@@ -15,6 +15,7 @@ namespace KNet
     {
         private static KNet_Server server = null;
         private static KNet_Client client = null;
+        private static List<KNet_ReliablePacket> packetQueue = new List<KNet_ReliablePacket>();
 
         public static KNet_Packet DeserializePacket(byte[] buffer, int offset, int count)
         {
@@ -58,6 +59,11 @@ namespace KNet
                 method.Invoke(server, packet.rpcArgs);
                 return true;
             }
+            else if(packet.rpcName == "INTERNAL_FREE-RELIABLE")
+            {
+                FreeReliablePacket(packet.packetID);
+                return true;
+            }
             else return false;
 
         }
@@ -82,6 +88,31 @@ namespace KNet
             else return false;
         }
 
+        public static void SendUDP(byte[] packet, EndPoint endPoint, Socket socket) { socket.SendTo(packet, endPoint); }
+        public static void SendUDPReliable(byte[] packet, EndPoint endPoint, Socket socket)
+        {
+            packetQueue.Add(new KNet_ReliablePacket(){ packet = packet, endPoint = endPoint });
+            foreach(KNet_ReliablePacket p in packetQueue) { socket.SendTo(packet, p.endPoint); }
+        }
+        public static void FreeReliablePacket(long packetID)
+        {
+            foreach(KNet_ReliablePacket p in packetQueue.ToArray())
+            {
+                KNet_Packet packet = DeserializePacket(p.packet, 0, p.packet.Length);
+                if(packet.packetID == packetID)
+                {
+                    packetQueue.Remove(p);
+                    return;
+                }
+            }
+        }
+
+    }
+
+    struct KNet_ReliablePacket
+    {
+        public byte[] packet;
+        public EndPoint endPoint;
     }
 
     [Serializable]
@@ -91,6 +122,8 @@ namespace KNet
         public object[] rpcArgs;
         public byte[] rpcTarget;
         public byte[] origin;
+        public bool isReliable;
+        public long packetID;
     }
 
     public class KNet_User
@@ -155,7 +188,10 @@ namespace KNet
                     IPAddress address = new IPAddress(user.id);
 
                     EndPoint endPoint = new IPEndPoint(address, port);
-                    sendSocket.SendTo(buffer, endPoint);
+                    if(packet.isReliable)
+                    {
+                        KNet.SendUDPReliable(buffer, endPoint, sendSocket);
+                    }else KNet.SendUDP(buffer, endPoint, sendSocket);
                 }
             }
             else
@@ -165,7 +201,11 @@ namespace KNet
                 Console.WriteLine("Sending packet " + packet.rpcName + " to " + address.ToString());
 
                 EndPoint endPoint = new IPEndPoint(address, port);
-                sendSocket.SendTo(buffer, endPoint);
+                if (packet.isReliable)
+                {
+                    KNet.SendUDPReliable(buffer, endPoint, sendSocket);
+                }
+                else KNet.SendUDP(buffer, endPoint, sendSocket);
             }
 
         }
@@ -182,6 +222,20 @@ namespace KNet
 
                 KNet_Packet packet = KNet.DeserializePacket(buffer, 0, received);
                 packet.origin = ipEndPoint.Address.GetAddressBytes();
+
+                if(packet.isReliable)
+                {
+                    KNet_Packet freeReliable = new KNet_Packet()
+                    {
+                        rpcName = "INTERNAL_FREE-RELIABLE",
+                        packetID = packet.packetID,
+                        isReliable = false,
+                        rpcTarget = packet.origin
+                    };
+
+                    SendPacket(packet);
+
+                }
 
                 Console.WriteLine("Received Packet " + packet.rpcName + " from " + ipEndPoint.Address.ToString());
 
@@ -206,7 +260,9 @@ namespace KNet
                 KNet_Packet packet = new KNet_Packet {
                     rpcName = "RPC_LoginSuccess",
                     rpcArgs = new object[0], //This will be Account Data in the future
-                    rpcTarget = user.id
+                    rpcTarget = user.id,
+                    packetID = DateTime.UtcNow.Ticks,
+                    isReliable = true
                 };
 
                 SendPacket(packet);
@@ -224,6 +280,9 @@ namespace KNet
             }else if(packet.rpcName.StartsWith("CMD"))
             {
                 KNet.ExecutePacket(packet);
+            }else if(packet.rpcName == "INTERNAL_FREE-RELIABLE")
+            {
+                KNet.FreeReliablePacket(packet.packetID);
             }
         }
 
@@ -253,7 +312,9 @@ namespace KNet
                 {
                     rpcName = "RPC_LoginFailed",
                     rpcArgs = new object[] { "The Server was full." }, //Reason for failure
-                    rpcTarget = originOfCurrentProcessedPacket
+                    rpcTarget = originOfCurrentProcessedPacket,
+                    packetID = DateTime.UtcNow.Ticks,
+                    isReliable = true
                 };
 
                 SendPacket(packet);
@@ -312,13 +373,14 @@ namespace KNet
             SendRPC("CMD_Login", new byte[0], username, passwordHash);
         }
 
-        public void SendRPC(string name, byte[] target, params object[] args)
+        public void SendRPC(string name, byte[] target, bool reliable, params object[] args)
         {
             KNet_Packet packet = new KNet_Packet
             {
                 rpcName = name,
                 rpcTarget = target,
-                rpcArgs = args
+                rpcArgs = args,
+                isReliable = reliable
             };
 
             SendPacket(packet);
@@ -327,7 +389,11 @@ namespace KNet
         private void SendPacket(KNet_Packet packet)
         {
             byte[] buffer = KNet.SerializePacket(packet);
-            sendSocket.SendTo(buffer, host);
+            if (packet.isReliable)
+            {
+                KNet.SendUDPReliable(buffer, host, sendSocket);
+            }
+            else KNet.SendUDP(buffer, host, sendSocket);
             Console.WriteLine("Sent Packet " + packet.rpcName);
         }
 
@@ -339,6 +405,18 @@ namespace KNet
                 int received = receiveSocket.Receive(buffer);
 
                 KNet_Packet packet = KNet.DeserializePacket(buffer, 0, received);
+
+                if(packet.isReliable)
+                {
+                    KNet_Packet freeReliable = new KNet_Packet()
+                    {
+                        isReliable = false,
+                        packetID = packet.packetID,
+                        rpcName = "INTERNAL_FREE-RELIABLE",
+                    };
+
+                    SendPacket(freeReliable);
+                }
 
                 Console.WriteLine("Received Packet " + packet.rpcName);
 
