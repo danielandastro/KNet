@@ -91,45 +91,6 @@ namespace KNet
         public object[] rpcArgs;
         public byte[] rpcTarget;
         public byte[] origin;
-
-        public override string ToString()
-        {
-            string args = "rpcArgs->[";
-            foreach(object o in rpcArgs)
-            {
-                args += o.ToString() + ", ";
-            }
-            args = args.TrimEnd(',', ' ');
-            args += "]";
-
-            string origin_str = "origin->";
-            if (origin != null)
-            {
-                origin_str += "[";
-                foreach (byte b in origin)
-                {
-                    origin_str += b.ToString() + ", ";
-                }
-                origin_str = origin_str.TrimEnd(',', ' ');
-                origin_str += "]";
-            }
-            else origin_str += "NULL";
-
-            string target = "rpcTarget->";
-            if (rpcTarget != null)
-            {
-                target += "[";
-                foreach (byte b in rpcTarget)
-                {
-                    target += b.ToString() + ", ";
-                }
-                target = target.TrimEnd(',', ' ');
-                target += "]";
-            }
-            else target += "NULL";
-
-            return "KNet_Packet::rpcName->" + rpcName + "::" + args + "::" + target + "::" + origin_str;
-        }
     }
 
     public class KNet_User
