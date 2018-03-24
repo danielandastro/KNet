@@ -10,14 +10,14 @@ namespace KNet_Client
 
         public void RPC_Echo(string message)
         {
-            Console.WriteLine("Remote: " + message);
+            Console.WriteLine("Remote: {0}", message);
         }
 
         public void RPC_LoginSuccess() { Console.WriteLine("Successfully logged in."); }
 
         public void RPC_LoginFailed(string message)
         {
-            Console.WriteLine("Login failed. " + message);
+            Console.WriteLine("Login failed. {0}", message);
         }
 
     }
@@ -35,7 +35,7 @@ namespace KNet_Client
             while(client.isRunning)
             {
                 string message = Console.ReadLine();
-                client.SendRPC("RPC_Echo", new byte[0], message);
+                client.SendRPC("RPC_Echo", new byte[0], true, message);
             }
 
         }

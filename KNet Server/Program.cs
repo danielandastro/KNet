@@ -19,7 +19,7 @@ namespace KNet_Server
             catch(Exception e)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(e.Message + "\n" + e.StackTrace);
+                Console.WriteLine("{0}\n{1}", e.Message, e.StackTrace);
                 Console.ResetColor();
                 Console.WriteLine("Press any key to continue...");
                 Console.ReadKey();

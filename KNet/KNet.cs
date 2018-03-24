@@ -182,7 +182,7 @@ namespace KNet
 
             if (packet.rpcTarget.Length == 0 || (packet.rpcTarget.Length == 1 && packet.rpcTarget[0] == 0))
             {
-                Console.WriteLine("Sending packet " + packet.rpcName + " to all users.");
+                Console.WriteLine("Sending packet {0} to all users.", packet.rpcName);
                 foreach (KNet_User user in activeUsers.ToArray())
                 {
                     IPAddress address = new IPAddress(user.id);
@@ -198,7 +198,7 @@ namespace KNet
             {
                 IPAddress address = new IPAddress(packet.rpcTarget);
 
-                Console.WriteLine("Sending packet " + packet.rpcName + " to " + address.ToString());
+                Console.WriteLine("Sending packet {0} to {1}", packet.rpcName, address);
 
                 EndPoint endPoint = new IPEndPoint(address, port);
                 if (packet.isReliable)
@@ -237,7 +237,7 @@ namespace KNet
 
                 }
 
-                Console.WriteLine("Received Packet " + packet.rpcName + " from " + ipEndPoint.Address.ToString());
+                Console.WriteLine("Received Packet {0} from {1}", packet.rpcName, ipEndPoint.Address);
 
                 ParsePacket(packet);
             }
@@ -394,7 +394,7 @@ namespace KNet
                 KNet.SendUDPReliable(buffer, host, sendSocket);
             }
             else KNet.SendUDP(buffer, host, sendSocket);
-            Console.WriteLine("Sent Packet " + packet.rpcName);
+            Console.WriteLine("Sent Packet {0}", packet.rpcName);
         }
 
         private void HandleIncomingData()
@@ -418,7 +418,7 @@ namespace KNet
                     SendPacket(freeReliable);
                 }
 
-                Console.WriteLine("Received Packet " + packet.rpcName);
+                Console.WriteLine("Received Packet {0}", packet.rpcName);
 
                 KNet.ExecutePacket(packet);
             }
